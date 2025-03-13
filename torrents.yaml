@@ -1,0 +1,408 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: plex
+  labels:
+    name: plex
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: port-service
+  namespace: plex
+  labels:
+    app: plex
+spec:
+  ports:
+    - name: radarr-port
+      port: 7878
+      targetPort: 7878
+      nodePort: 30001
+    - name: sonarr-port
+      port: 8989
+      targetPort: 8989
+      nodePort: 30002
+    - name: jackett-port
+      port: 9117
+      targetPort: 9117
+      nodePort: 30003
+    - name: qbittorrent-port
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+      nodePort: 30004
+    - name: qbittorrent-port2
+      protocol: TCP
+      port: 6881
+      targetPort: 6881
+      nodePort: 30005
+    - name: qbittorrent-port3
+      protocol: UDP
+      port: 6881
+      targetPort: 6881
+      nodePort: 30006
+    - name: heimdall-port
+      port: 443 # Host port
+      targetPort: 443 # Pod port
+      nodePort: 30007
+  selector: #Label selector used to identify pods
+    app: plex
+  type: NodePort
+
+---
+apiVersion: apps/v1    #kubectl api-resources | grep {kind}
+kind: Deployment
+metadata:
+  name: radarr-plex-deployment
+  namespace: plex
+  labels:
+    app: plex
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+        app: plex
+  template:
+    metadata:
+      labels:
+        app: plex
+    spec:
+      containers:
+      - name: radarr
+        image: lscr.io/linuxserver/radarr:5.18.4.9674-LS260
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 7878
+        volumeMounts:
+        - mountPath: /config
+          name: radarr-config
+        - mountPath: /mnt/Media
+          name: movies-shows-raid
+        - mountPath: /downloads
+          name: torrent-downloads
+      volumes:
+      - name: radarr-config
+        hostPath:
+          path: /home/server/docker/radarr/config
+          type: Directory
+      - name: movies-shows-raid
+        hostPath:
+          path: /mnt/Media
+          type: Directory
+      - name: torrent-downloads
+        hostPath:
+          path: /downloads
+          type: Directory
+
+---
+apiVersion: apps/v1    #kubectl api-resources | grep {kind}
+kind: Deployment
+metadata:
+  name: sonarr-plex-deployment
+  namespace: plex
+  labels:
+    app: plex
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+        app: plex
+  template:
+    metadata:
+      labels:
+        app: plex
+    spec:
+      containers:
+      - name: sonarr
+        image: lscr.io/linuxserver/sonarr:4.0.13.2932-LS272
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8989
+        volumeMounts:
+        - mountPath: /config
+          name: sonarr-config
+        - mountPath: /mnt/Media
+          name: movies-shows-raid
+        - mountPath: /downloads
+          name: torrent-downloads
+      volumes:
+      - name: sonarr-config
+        hostPath:
+          path: /home/server/docker/sonarr/config
+          type: Directory
+      - name: movies-shows-raid
+        hostPath:
+          path: /mnt/Media
+          type: Directory
+      - name: torrent-downloads
+        hostPath:
+          path: /downloads
+          type: Directory
+
+---
+apiVersion: apps/v1    #kubectl api-resources | grep {kind}
+kind: Deployment
+metadata:
+  name: jackett-plex-deployment
+  namespace: plex
+  labels:
+    app: plex
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+        app: plex
+  template:
+    metadata:
+      labels:
+        app: plex
+    spec:
+      containers:
+      - name: jackett
+        image: lscr.io/linuxserver/jackett:v0.22.1450-LS685
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9117
+        volumeMounts:
+        - mountPath: /config
+          name: jackett-config
+        - mountPath: /mnt/Media
+          name: movies-shows-raid
+        - mountPath: /downloads
+          name: torrent-downloads
+      volumes:
+      - name: jackett-config
+        hostPath:
+          path: /home/server/docker/jackett/config
+          type: Directory
+      - name: movies-shows-raid
+        hostPath:
+          path: /mnt/Media
+          type: Directory
+      - name: torrent-downloads
+        hostPath:
+          path: /downloads
+          type: Directory
+
+---
+
+apiVersion: apps/v1    #kubectl api-resources | grep {kind}
+kind: Deployment
+metadata:
+  name: heimdall-plex-deployment
+  namespace: plex
+  labels:
+    app: plex
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+        app: plex
+  template:
+    metadata:
+      labels:
+        app: plex
+    spec:
+      containers:
+      - name: heimdall
+        image: linuxserver/heimdall:v2.6.3-ls301
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 443
+        volumeMounts:
+        - mountPath: /config
+          name: heimdall-config
+      volumes:
+      - name: heimdall-config
+        hostPath:
+          path: /home/server/docker/heimdall/config
+          type: Directory
+      - name: movies-shows-raid
+        hostPath:
+          path: /mnt/Media
+          type: Directory
+      - name: torrent-downloads
+        hostPath:
+          path: /downloads
+          type: Directory
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qbit-plex-deployment
+  namespace: plex
+  labels:
+    app: plex
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+        app: plex
+  template:
+    metadata:
+      labels:
+        app: plex
+    spec:
+      securityContext:
+        sysctls:
+        - name: net.ipv4.conf.all.src_valid_mark
+          value: "1"
+        - name: net.ipv6.conf.all.disable_ipv6
+          value: "1"
+      initContainers:
+        - name: file-transfer
+          image: busybox
+          command:
+            - sh
+            - "-c"
+            - |
+              cp -r /host/. /data/  # Copy everything from hostPath to emptyDir
+              chown -R 1000:1000 /data  # Change ownership (if needed)
+              ip route add 10.244.0.0/16 dev eth0 scope link src $(ip -o -4 addr show dev eth0 | awk '{print $4}' | cut -d/ -f1) proto kernel
+          securityContext:
+            capabilities:
+              add:
+              - NET_ADMIN
+          volumeMounts:
+            - name: host-data
+              mountPath: /host  # Mount hostPath as /host inside the container
+            - name: shared-storage
+              mountPath: /data
+        - name: copy-data
+          image: busybox
+          command:
+            - sh
+            - "-c"
+            - |
+              cp -r /host-data/. /data/  # Copy everything, including hidden files
+              chown -R 1000:1000 /data  # Change ownership
+          volumeMounts:
+            - name: data-source
+              mountPath: /host-data  # Mount hostPath for /data
+            - name: data-storage
+              mountPath: /data  # Mount emptyDir for /data
+      containers:
+      - env:
+        - name: PRIVOXY_ENABLED
+          value: "false"
+        - name: UNBOUND_ENABLED
+          value: "false"
+        - name: VPN_AUTO_PORT_FORWARD
+          value: "false"
+        - name: VPN_AUTO_PORT_FORWARD_TO_PORTS
+        - name: VPN_CONF
+          value: wg0
+        - name: VPN_ENABLED
+          value: "true"
+        - name: VPN_FIREWALL_TYPE
+          value: auto
+        - name: VPN_HEALTHCHECK_ENABLED
+          value: "true"
+        - name: VPN_KEEP_LOCAL_DNS
+          value: "false"
+        - name: VPN_LAN_LEAK_ENABLED
+          value: "false"
+        - name: VPN_FIREWALL_TYPE
+          value: "auto"
+        - name: VPN_LAN_NETWORK
+          value: 192.168.1.0/24
+        - name: VPN_PROVIDER
+          value: generic
+        image: hotio/qbittorrent
+        imagePullPolicy: Always
+        name: qbittorrent
+          #command: ["sh", "-c", "sleep 2000"]
+        ports:
+        - protocol: TCP
+          containerPort: 8080
+        - protocol: TCP
+          containerPort: 6881
+        - protocol: UDP
+          containerPort: 6881
+        volumeMounts:
+        - name: shared-storage
+          mountPath: /config
+        - name: data-storage
+          mountPath: /data
+        - mountPath: /mnt/Media
+          name: movies-shows-raid
+        - mountPath: /downloads
+          name: torrent-downloads
+        resources:
+        securityContext:
+          readOnlyRootFilesystem: false
+          capabilities:
+            add:
+            - NET_ADMIN
+      hostname: hotio-qbit
+      restartPolicy: Always
+      serviceAccountName: ""
+      volumes:
+      - name: host-data
+        hostPath:
+          path: /home/server/docker/qbittorrent/config/config/  # Correct host path
+          type: Directory
+      - name: data-source
+        hostPath:
+          path: /home/server/docker/qbittorrent/config/data/  # Host source for /data
+          type: Directory
+      - name: shared-storage
+        emptyDir: {}
+      - name: data-storage
+        emptyDir: {}
+      - name: movies-shows-raid
+        hostPath:
+          path: /mnt/Media
+          type: Directory
+      - name: torrent-downloads
+        hostPath:
+          path: /downloads
+          type: Directory
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qbit-configmap
+  namespace: plex
+data:
+  wg0.conf: |
+    # TorGuard WireGuard Config
+    [Interface]
+    PrivateKey = CHANGEME
+    ListenPort = 59126
+    MTU = 1390
+    DNS = 1.1.1.1
+    Address = 10.13.114.221/24
+
+    [Peer]
+    PublicKey = CHANGEME
+    AllowedIPs = 0.0.0.0/0
+    Endpoint = 146.70.49.82:1443
+    PersistentKeepalive = 25
